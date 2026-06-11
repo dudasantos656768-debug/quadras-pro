@@ -67,8 +67,16 @@ function formatDateBR(value) {
 function formatDateTimeBR(value) {
     if (!value) return '-';
     return new Date(value).toLocaleString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
         dateStyle: 'short',
         timeStyle: 'short'
+    });
+}
+
+function formatOnlyDateBR(value) {
+    if (!value) return '-';
+    return new Date(value).toLocaleDateString('pt-BR', {
+        timeZone: 'America/Sao_Paulo'
     });
 }
 
@@ -661,7 +669,7 @@ async function abrirAvaliacoes(quadraId) {
             <article class="review-item">
                 <div>
                     <strong>${escapeHTML(item.cliente_nome || 'Cliente')}</strong>
-                    <span>${formatDateTimeBR(item.created_at)}</span>
+                    <span>${formatOnlyDateBR(item.created_at)}</span>
                 </div>
                 <div class="stars">${'★'.repeat(Number(item.nota))}${'☆'.repeat(5 - Number(item.nota))}</div>
                 <p>${escapeHTML(item.comentario || 'Sem comentário.')}</p>
@@ -977,7 +985,7 @@ async function carregarAdminAvaliacoes() {
                             </span>
                         </td>
                         <td>${escapeHTML(item.comentario || 'Sem comentario.')}</td>
-                        <td>${formatDateTimeBR(item.created_at)}</td>
+                        <td>${formatOnlyDateBR(item.created_at)}</td>
                         <td>
                             <button class="icon-btn danger" type="button" title="Remover" onclick="removerAvaliacao(${item.id})">
                                 <i class="fa-solid fa-trash"></i>

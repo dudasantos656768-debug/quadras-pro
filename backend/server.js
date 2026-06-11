@@ -23,6 +23,7 @@ const PIX_CITY = process.env.PIX_CITY || 'SAO PAULO';
 const APP_URL = (process.env.APP_URL || process.env.PUBLIC_URL || '').replace(/\/$/, '');
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
 const MAIL_FROM = process.env.MAIL_FROM || process.env.SMTP_USER || 'Quadras Pro <no-reply@quadraspro.com>';
+const APP_TIMEZONE = process.env.APP_TIMEZONE || 'America/Sao_Paulo';
 
 const frontendDir = path.join(__dirname, '../frontend');
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -152,6 +153,14 @@ function formatMoneyBR(value) {
     });
 }
 
+function formatDateTimeLocal(date = new Date()) {
+    return new Intl.DateTimeFormat('pt-BR', {
+        timeZone: APP_TIMEZONE,
+        dateStyle: 'short',
+        timeStyle: 'short'
+    }).format(date);
+}
+
 function absoluteUrl(pathname) {
     if (!pathname) return '';
     if (/^https?:\/\//i.test(pathname)) return pathname;
@@ -182,6 +191,7 @@ async function sendProofReceivedEmail(booking) {
     const adminUrl = APP_URL ? `${APP_URL}/admin.html` : '';
     const text = [
         'Um cliente enviou um comprovante de pagamento.',
+        `Recebido em: ${formatDateTimeLocal()} (horario de Campinas/SP)`,
         '',
         bookingSummary(booking),
         proofUrl ? `Comprovante: ${proofUrl}` : '',
@@ -203,6 +213,7 @@ async function sendBookingApprovedEmail(booking) {
         `Ola, ${booking.cliente_nome || 'cliente'}!`,
         '',
         'Seu comprovante foi aprovado e sua reserva esta confirmada.',
+        `Confirmado em: ${formatDateTimeLocal()} (horario de Campinas/SP)`,
         '',
         bookingSummary(booking),
         booking.observacao ? `Observacao: ${booking.observacao}` : ''
