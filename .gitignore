@@ -1,0 +1,17 @@
+node_modules/
+npm-debug.log*
+
+.env
+.env.*
+
+quadras.db
+*.sqlite
+*.sqlite3
+
+server.log
+server.err.log
+*.log
+
+uploads/comprovantes/
+uploads/quadras/
+!uploads/.gitkeep

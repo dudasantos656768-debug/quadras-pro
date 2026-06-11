@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Admin - Quadras Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="admin-page">
+    <nav class="app-navbar admin-navbar">
+        <div class="container-fluid app-navbar-inner">
+            <a href="/admin" class="brand-mark">
+                <span class="brand-logo-box">
+                    <img src="assets/logo_QUADRASPRO.png" alt="Quadras Pro">
+                </span>
+                <span class="brand-text">
+                    <strong>Quadras Pro</strong>
+                    <small>Painel administrativo</small>
+                </span>
+            </a>
+            <div class="nav-actions">
+                <span class="admin-user">
+                    <i class="fa-solid fa-user-tie"></i>
+                    <strong id="adminNome"></strong>
+                </span>
+                <a href="/" class="btn btn-soft">
+                    <i class="fa-solid fa-house"></i>
+                    Site
+                </a>
+                <button class="btn btn-outline-danger" type="button" onclick="logout()">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    Sair
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="admin-shell">
+        <aside class="admin-sidebar">
+            <div class="admin-brand-card">
+                <img src="assets/logo_QUADRASPRO.png" alt="Quadras Pro">
+                <strong>Central Quadras Pro</strong>
+            </div>
+            <button class="admin-nav-link active" type="button" data-section="quadras">
+                <i class="fa-solid fa-futbol"></i>
+                Quadras
+            </button>
+            <button class="admin-nav-link" type="button" data-section="agendamentos">
+                <i class="fa-solid fa-calendar-check"></i>
+                Agendamentos
+            </button>
+            <button class="admin-nav-link" type="button" data-section="bloqueios">
+                <i class="fa-solid fa-lock"></i>
+                Horários fechados
+            </button>
+        </aside>
+
+        <section class="admin-content">
+            <div class="admin-header admin-hero-panel">
+                <div>
+                    <span class="eyebrow">Operação esportiva</span>
+                    <h1>Gestão de quadras e reservas</h1>
+                    <p>Cadastre quadras, acompanhe comprovantes e feche horários com controle total da agenda.</p>
+                </div>
+                <button class="btn btn-primary-action" type="button" onclick="atualizarAdmin()">
+                    <i class="fa-solid fa-rotate"></i>
+                    Atualizar
+                </button>
+            </div>
+
+            <div class="metrics-grid" id="adminStats"></div>
+
+            <section class="admin-section" id="secQuadras">
+                <div class="section-heading">
+                    <span class="eyebrow">Cadastro</span>
+                    <h2>Quadras</h2>
+                </div>
+
+                <form id="formNovaQuadra" class="panel form-panel">
+                    <div class="row g-3">
+                        <div class="col-lg-3 col-md-6">
+                            <label class="form-label" for="nomeQuadra">Nome</label>
+                            <input type="text" class="form-control" id="nomeQuadra" required>
+                        </div>
+                        <div class="col-lg-2 col-md-6">
+                            <label class="form-label" for="tipoQuadra">Tipo</label>
+                            <input type="text" class="form-control" id="tipoQuadra" placeholder="Society" required>
+                        </div>
+                        <div class="col-lg-2 col-md-6">
+                            <label class="form-label" for="precoQuadra">Preço/hora</label>
+                            <input type="number" class="form-control" id="precoQuadra" step="0.01" min="1" required>
+                        </div>
+                        <div class="col-lg-2 col-md-6">
+                            <label class="form-label" for="statusQuadra">Status</label>
+                            <select class="form-select" id="statusQuadra">
+                                <option value="disponivel">Disponível</option>
+                                <option value="manutencao">Manutenção</option>
+                                <option value="indisponivel">Indisponível</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-3 col-md-12">
+                            <label class="form-label" for="imagemQuadra">Imagem</label>
+                            <input type="file" class="form-control" id="imagemQuadra" accept="image/*">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="descricaoQuadra">Descrição</label>
+                            <textarea class="form-control" id="descricaoQuadra" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary-action">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            Cadastrar quadra
+                        </button>
+                    </div>
+                </form>
+
+                <div class="panel mt-4">
+                    <div class="table-header">
+                        <div>
+                            <span class="eyebrow">Inventário</span>
+                            <h3>Quadras cadastradas</h3>
+                        </div>
+                    </div>
+                    <div id="listaAdminQuadras" class="table-responsive"></div>
+                </div>
+            </section>
+
+            <section class="admin-section d-none" id="secAgendamentos">
+                <div class="section-heading">
+                    <span class="eyebrow">Comprovantes</span>
+                    <h2>Agendamentos</h2>
+                </div>
+                <div class="panel">
+                    <div id="listaAgendamentos" class="table-responsive"></div>
+                </div>
+            </section>
+
+            <section class="admin-section d-none" id="secBloqueios">
+                <div class="section-heading">
+                    <span class="eyebrow">Agenda</span>
+                    <h2>Fechar horários</h2>
+                </div>
+
+                <form id="formBloqueio" class="panel form-panel">
+                    <div class="row g-3">
+                        <div class="col-lg-3 col-md-6">
+                            <label class="form-label" for="bloqueioQuadra">Quadra</label>
+                            <select class="form-select" id="bloqueioQuadra" required></select>
+                        </div>
+                        <div class="col-lg-2 col-md-6">
+                            <label class="form-label" for="bloqueioData">Data</label>
+                            <input type="date" class="form-control" id="bloqueioData" required>
+                        </div>
+                        <div class="col-lg-2 col-md-6">
+                            <label class="form-label" for="bloqueioHorario">Horário</label>
+                            <select class="form-select" id="bloqueioHorario" required></select>
+                        </div>
+                        <div class="col-lg-2 col-md-6">
+                            <label class="form-label" for="bloqueioDuracao">Duração</label>
+                            <select class="form-select" id="bloqueioDuracao">
+                                <option value="1">1 hora</option>
+                                <option value="2">2 horas</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-3 col-md-12">
+                            <label class="form-label" for="bloqueioMotivo">Motivo</label>
+                            <input type="text" class="form-control" id="bloqueioMotivo" placeholder="Manutenção, evento, limpeza">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary-action">
+                            <i class="fa-solid fa-lock"></i>
+                            Fechar horário
+                        </button>
+                    </div>
+                </form>
+
+                <div class="panel mt-4">
+                    <div class="table-header">
+                        <div>
+                            <span class="eyebrow">Bloqueios</span>
+                            <h3>Horários fechados</h3>
+                        </div>
+                    </div>
+                    <div id="listaBloqueios" class="table-responsive"></div>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <div class="modal fade" id="editarQuadraModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content clean-modal">
+                <div class="modal-header">
+                    <div>
+                        <span class="eyebrow">Editar</span>
+                        <h5 class="modal-title">Quadra</h5>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <form id="formEditarQuadra">
+                    <div class="modal-body">
+                        <input type="hidden" id="editQuadraId">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="editNomeQuadra">Nome</label>
+                                <input type="text" class="form-control" id="editNomeQuadra" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="editTipoQuadra">Tipo</label>
+                                <input type="text" class="form-control" id="editTipoQuadra" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="editPrecoQuadra">Preço/hora</label>
+                                <input type="number" class="form-control" id="editPrecoQuadra" step="0.01" min="1" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="editStatusQuadra">Status</label>
+                                <select class="form-select" id="editStatusQuadra">
+                                    <option value="disponivel">Disponível</option>
+                                    <option value="manutencao">Manutenção</option>
+                                    <option value="indisponivel">Indisponível</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="editImagemQuadra">Nova imagem</label>
+                                <input type="file" class="form-control" id="editImagemQuadra" accept="image/*">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="editDescricaoQuadra">Descrição</label>
+                                <textarea class="form-control" id="editDescricaoQuadra" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-primary-action">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            Salvar alterações
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
