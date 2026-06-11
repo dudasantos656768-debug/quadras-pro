@@ -13,6 +13,7 @@ let quadrasCache = [];
 let adminQuadrasCache = [];
 let adminAgendamentosCache = [];
 let adminBloqueiosCache = [];
+let adminAvaliacoesCache = [];
 let minhasReservasCache = [];
 let pixCountdownTimer = null;
 
@@ -933,6 +934,79 @@ async function alterarStatusAgendamento(id, status) {
     }
 }
 
+async function carregarAdminAvaliacoes() {
+    const container = $('listaAdminAvaliacoes');
+    if (container) container.innerHTML = '<div class="loading-line">Carregando avaliacoes...</div>';
+
+    adminAvaliacoesCache = await apiFetch('/admin/avaliacoes', { headers: authHeaders() });
+    if (!container) return;
+
+    if (!adminAvaliacoesCache.length) {
+        container.innerHTML = `
+            <div class="empty-state compact">
+                <i class="fa-regular fa-star"></i>
+                <strong>Nenhuma avaliacao cadastrada</strong>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = `
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Cliente</th>
+                    <th>Quadra</th>
+                    <th>Nota</th>
+                    <th>Comentario</th>
+                    <th>Data</th>
+                    <th>Acoes</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${adminAvaliacoesCache.map((item) => `
+                    <tr>
+                        <td>
+                            <strong>${escapeHTML(item.cliente_nome || 'Cliente')}</strong>
+                            <small>${escapeHTML(item.cliente_email || '')}</small>
+                        </td>
+                        <td>${escapeHTML(item.quadra_nome || '-')}</td>
+                        <td>
+                            <span class="stars">
+                                ${Array.from({ length: Number(item.nota) }, () => '<i class="fa-solid fa-star"></i>').join('')}
+                            </span>
+                        </td>
+                        <td>${escapeHTML(item.comentario || 'Sem comentario.')}</td>
+                        <td>${formatDateTimeBR(item.created_at)}</td>
+                        <td>
+                            <button class="icon-btn danger" type="button" title="Remover" onclick="removerAvaliacao(${item.id})">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+async function removerAvaliacao(id) {
+    if (!confirm('Remover esta avaliacao?')) return;
+
+    try {
+        await apiFetch(`/admin/avaliacoes/${id}`, {
+            method: 'DELETE',
+            headers: authHeaders()
+        });
+        showAlert('Avaliacao removida.');
+        await carregarAdminAvaliacoes();
+        await carregarAdminQuadras();
+        renderAdminStats();
+    } catch (err) {
+        showAlert(err.message, 'danger');
+    }
+}
+
 async function cadastrarBloqueio(event) {
     event.preventDefault();
     const dados = {
@@ -1060,6 +1134,7 @@ async function atualizarAdmin() {
         await Promise.all([
             carregarAdminQuadras(),
             carregarAdminAgendamentos(),
+            carregarAdminAvaliacoes(),
             carregarBloqueios()
         ]);
         renderAdminStats();

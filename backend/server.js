@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const QRCode = require('qrcode');
 const fs = require('fs');
+const nodemailer = require('nodemailer');
 
 const db = require('./db');
 const auth = require('./auth');
@@ -19,6 +20,9 @@ const PIX_KEY_DISPLAY = '(19) 98755-7577';
 const PIX_KEY = process.env.PIX_KEY || '+5519987557577';
 const PIX_RECEIVER = process.env.PIX_RECEIVER || 'Quadras Pro';
 const PIX_CITY = process.env.PIX_CITY || 'SAO PAULO';
+const APP_URL = (process.env.APP_URL || process.env.PUBLIC_URL || '').replace(/\/$/, '');
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
+const MAIL_FROM = process.env.MAIL_FROM || process.env.SMTP_USER || 'Quadras Pro <no-reply@quadraspro.com>';
 
 const frontendDir = path.join(__dirname, '../frontend');
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -79,6 +83,137 @@ function asyncHandler(fn) {
 
 function sendError(res, status, message) {
     return res.status(status).json({ sucesso: false, error: message });
+}
+
+let mailTransporter = null;
+
+function getMailTransporter() {
+    if (mailTransporter) return mailTransporter;
+    if (!process.env.SMTP_HOST) return null;
+
+    const config = {
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT || 587),
+        secure: String(process.env.SMTP_SECURE || '').toLowerCase() === 'true'
+    };
+
+    if (process.env.SMTP_USER || process.env.SMTP_PASS) {
+        config.auth = {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS
+        };
+    }
+
+    mailTransporter = nodemailer.createTransport(config);
+    return mailTransporter;
+}
+
+async function sendMail({ to, subject, text, html }) {
+    const recipients = Array.isArray(to)
+        ? to.filter(Boolean)
+        : String(to || '').split(',').map((item) => item.trim()).filter(Boolean);
+
+    if (!recipients.length) {
+        console.warn('Email nao enviado: nenhum destinatario configurado.');
+        return false;
+    }
+
+    const transporter = getMailTransporter();
+    if (!transporter) {
+        console.warn(`Email nao enviado para ${recipients.join(', ')}: SMTP_HOST nao configurado.`);
+        return false;
+    }
+
+    try {
+        await transporter.sendMail({
+            from: MAIL_FROM,
+            to: recipients.join(', '),
+            subject,
+            text,
+            html
+        });
+        return true;
+    } catch (err) {
+        console.error('Falha ao enviar email:', err.message);
+        return false;
+    }
+}
+
+function formatDateBR(date) {
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return date || '-';
+    const [year, month, day] = String(date).split('-');
+    return `${day}/${month}/${year}`;
+}
+
+function formatMoneyBR(value) {
+    return Number(value || 0).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+    });
+}
+
+function absoluteUrl(pathname) {
+    if (!pathname) return '';
+    if (/^https?:\/\//i.test(pathname)) return pathname;
+    return APP_URL ? `${APP_URL}${pathname}` : pathname;
+}
+
+async function adminEmailRecipients() {
+    if (ADMIN_EMAIL) return ADMIN_EMAIL.split(',').map((email) => email.trim()).filter(Boolean);
+
+    const admins = await db.allAsync("SELECT email FROM usuarios WHERE tipo = 'admin'");
+    return admins.map((admin) => admin.email).filter(Boolean);
+}
+
+function bookingSummary(booking) {
+    return [
+        `Reserva: #${booking.id}`,
+        `Cliente: ${booking.cliente_nome || 'Cliente'}`,
+        booking.cliente_email ? `Email: ${booking.cliente_email}` : '',
+        `Quadra: ${booking.quadra_nome || '-'}`,
+        `Data: ${formatDateBR(booking.data)}`,
+        `Horario: ${booking.horario || '-'}${booking.horario_fim ? ` ate ${booking.horario_fim}` : ''}`,
+        `Sinal: ${formatMoneyBR(booking.valor_sinal || booking.valor)}`
+    ].filter(Boolean).join('\n');
+}
+
+async function sendProofReceivedEmail(booking) {
+    const proofUrl = absoluteUrl(booking.comprovante);
+    const adminUrl = APP_URL ? `${APP_URL}/admin.html` : '';
+    const text = [
+        'Um cliente enviou um comprovante de pagamento.',
+        '',
+        bookingSummary(booking),
+        proofUrl ? `Comprovante: ${proofUrl}` : '',
+        adminUrl ? `Painel admin: ${adminUrl}` : ''
+    ].filter(Boolean).join('\n');
+
+    await sendMail({
+        to: await adminEmailRecipients(),
+        subject: `Comprovante recebido - reserva #${booking.id}`,
+        text,
+        html: text.replace(/\n/g, '<br>')
+    });
+}
+
+async function sendBookingApprovedEmail(booking) {
+    if (!booking.cliente_email) return false;
+
+    const text = [
+        `Ola, ${booking.cliente_nome || 'cliente'}!`,
+        '',
+        'Seu comprovante foi aprovado e sua reserva esta confirmada.',
+        '',
+        bookingSummary(booking),
+        booking.observacao ? `Observacao: ${booking.observacao}` : ''
+    ].filter(Boolean).join('\n');
+
+    return sendMail({
+        to: booking.cliente_email,
+        subject: `Reserva confirmada - #${booking.id}`,
+        text,
+        html: text.replace(/\n/g, '<br>')
+    });
 }
 
 async function authMiddleware(req, res, next) {
@@ -629,6 +764,19 @@ app.post('/api/comprovante/:id', authMiddleware, upload.single('comprovante'), a
         [publicFilePath(req.file), agendamento.id]
     );
 
+    const agendamentoAtualizado = await db.getAsync(`
+        SELECT a.*,
+               q.nome AS quadra_nome,
+               q.tipo AS quadra_tipo,
+               u.email AS cliente_email
+          FROM agendamentos a
+          JOIN quadras q ON q.id = a.quadra_id
+     LEFT JOIN usuarios u ON u.id = a.usuario_id
+         WHERE a.id = ?
+    `, [agendamento.id]);
+
+    await sendProofReceivedEmail(agendamentoAtualizado);
+
     res.json({ sucesso: true });
 }));
 
@@ -744,6 +892,44 @@ app.put('/api/admin/agendamentos/:id/status', authMiddleware, adminMiddleware, a
         [status, observacao, status, agendamento.id]
     );
 
+    if (status === 'confirmado') {
+        const agendamentoAtualizado = await db.getAsync(`
+            SELECT a.*,
+                   q.nome AS quadra_nome,
+                   q.tipo AS quadra_tipo,
+                   u.email AS cliente_email
+              FROM agendamentos a
+              JOIN quadras q ON q.id = a.quadra_id
+         LEFT JOIN usuarios u ON u.id = a.usuario_id
+             WHERE a.id = ?
+        `, [agendamento.id]);
+
+        await sendBookingApprovedEmail(agendamentoAtualizado);
+    }
+
+    res.json({ sucesso: true });
+}));
+
+// Admin - avaliacoes
+app.get('/api/admin/avaliacoes', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+    const avaliacoes = await db.allAsync(`
+        SELECT a.*,
+               q.nome AS quadra_nome,
+               q.tipo AS quadra_tipo,
+               u.email AS cliente_email
+          FROM avaliacoes a
+          JOIN quadras q ON q.id = a.quadra_id
+     LEFT JOIN usuarios u ON u.id = a.usuario_id
+      ORDER BY a.created_at DESC
+         LIMIT 200
+    `);
+
+    res.json(avaliacoes);
+}));
+
+app.delete('/api/admin/avaliacoes/:id', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+    const result = await db.runAsync('DELETE FROM avaliacoes WHERE id = ?', [req.params.id]);
+    if (!result.changes) return sendError(res, 404, 'Avaliacao nao encontrada.');
     res.json({ sucesso: true });
 }));
 
